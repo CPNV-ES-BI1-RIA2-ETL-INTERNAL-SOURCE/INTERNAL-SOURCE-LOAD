@@ -203,5 +203,43 @@ namespace INTERNAL_SOURCE_LOAD_TEST
             Assert.That(result2[0], Is.Not.EqualTo(result3[0]), "Update queries should be different for different trains");
             Assert.That(result1[0], Is.Not.EqualTo(result3[0]), "Update queries should be different for different trains");
         }
+
+        [Test]
+        public void GenerateUpdateForeignKeys_GivenDepartureWithTrainStation_ReturnsCorrectUpdateQueries()
+        {
+            // Given
+            var train = new Train("ICE", "DB123");
+            var departure = new Departure(
+                DepartureStationName: "Berlin",
+                DestinationStationName: "Munich",
+                ViaStationNames: new List<string> { "Frankfurt" },
+                DepartureTime: DateTime.Now,
+                Train: train,
+                Platform: "1",
+                TrainStationID: null  // This should be updated by the foreign key update
+            );
+            var trainStation = new TrainStation("Berlin Hbf", Departures: new List<Departure> { departure });
+
+
+            var modelIds = new Dictionary<object, long>
+                {
+                    { train, 42 },         // Train ID
+                    { trainStation, 55 },   // TrainStation ID
+                    { departure, 123 }      // Departure ID
+                };
+
+            var expectedQueries = new List<string>
+                {
+                    "UPDATE Departures SET TrainID = 42 WHERE Id = 123",
+                    "UPDATE Departures SET TrainStationID = 55 WHERE Id = 123"
+                };
+
+            // When
+            var result = SqlInsertGenerator.GenerateUpdateForeignKeysQueries(departure, modelIds);
+
+            // Then
+            Assert.That(result.Count, Is.EqualTo(2), "Should generate update queries for both Train and TrainStation");
+            Assert.That(result, Is.EquivalentTo(expectedQueries), "Should generate correct update queries for both foreign keys");
+        }
     }
 }
