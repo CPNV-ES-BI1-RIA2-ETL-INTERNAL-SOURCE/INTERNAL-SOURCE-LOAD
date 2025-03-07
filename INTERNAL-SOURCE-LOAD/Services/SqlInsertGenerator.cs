@@ -126,38 +126,58 @@ namespace INTERNAL_SOURCE_LOAD.Services
         // Function to update foreign keys dynamically
         public static List<string> GenerateUpdateForeignKeysQueries(object model, Dictionary<object, long> modelIds)
         {
-            var queries = new List<string>(); // To store generated queries
+            var queries = new List<string>();
             var modelType = model.GetType();
+            var tableName = GetTableName(modelType);
+            var processedRelationships = new HashSet<string>(); // Track which foreign keys we've handled
 
+            // First handle navigation properties (e.g., Train)
             foreach (var property in modelType.GetProperties())
             {
-                // Identify FK properties (e.g., properties ending with 'ID')
-                if (property.Name.EndsWith("ID"))
+                if (IsSimpleType(property.PropertyType))
+                    continue;
+
+                var navigationPropertyValue = property.GetValue(model);
+                if (navigationPropertyValue == null)
+                    continue;
+
+                // Handle direct navigation properties
+                if (modelIds.ContainsKey(navigationPropertyValue))
                 {
-                    // Infer the related model name by removing "ID" from the property name
-                    string relatedModelName = property.Name.Replace("ID", "");
+                    var foreignKeyId = modelIds[navigationPropertyValue];
+                    var foreignKeyPropertyName = $"{property.Name}ID";
 
-                    // Find the related model in the dictionary based on its type name
-                    var relatedModel = modelIds.Keys.FirstOrDefault(m => m.GetType().Name == relatedModelName);
+                    // Add to processed list to avoid duplicates
+                    processedRelationships.Add(foreignKeyPropertyName);
 
-                    if (relatedModel != null)
-                    {
-                        // Get the ID of the related model
-                        var relatedModelId = modelIds[relatedModel];
-
-                        // Use a utility function to get the table name
-                        var tableName = SqlInsertGenerator.GetTableName(modelType);
-
-                        // Generate the update query
-                        string updateQuery = $"UPDATE {tableName} SET {property.Name} = {relatedModelId} WHERE Id = {modelIds[model]}";
-
-                        // Add the generated query to the list
-                        queries.Add(updateQuery);
-                    }
+                    string updateQuery = $"UPDATE {tableName} SET {foreignKeyPropertyName} = {foreignKeyId} WHERE Id = {modelIds[model]}";
+                    queries.Add(updateQuery);
                 }
             }
 
-            return queries; // Return the list of queries
+            // Then handle explicit ID properties that weren't handled by navigation properties
+            foreach (var property in modelType.GetProperties())
+            {
+                if (!property.Name.EndsWith("ID") || property.Name == "Id")
+                    continue;
+
+                // Skip if we already handled this relationship via navigation property
+                if (processedRelationships.Contains(property.Name))
+                    continue;
+
+                // Find corresponding entity in modelIds
+                var relatedEntityName = property.Name.Substring(0, property.Name.Length - 2); // Remove "ID" suffix
+                var relatedEntity = modelIds.Keys.FirstOrDefault(k => k.GetType().Name == relatedEntityName);
+
+                if (relatedEntity != null)
+                {
+                    var foreignKeyId = modelIds[relatedEntity];
+                    string updateQuery = $"UPDATE {tableName} SET {property.Name} = {foreignKeyId} WHERE Id = {modelIds[model]}";
+                    queries.Add(updateQuery);
+                }
+            }
+
+            return queries;
         }
     }
 
