@@ -5,25 +5,44 @@ name: .NET
 
 on:
   push:
-    branches: [ "main", "develop" ]
+    branches: [ "main", "develop", "release/**" ]
   pull_request:
     branches: [ "*" ]
 
 jobs:
-  build:
-    runs-on: ubuntu-latest 
+  test:
+      runs-on: ubuntu-latest 
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Build and test Docker image
+        run: | 
+          docker build --target test -f Dockerfile -t internal-source-load:test . --no-cache
+          docker run --rm internal-source-load:test
+
+  # Deploy to production only on main  
+  deploy-production:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-        
-    - name: Build and test Docker image
-      run: | 
-        docker build --target test -f Dockerfile -t internal-source-load:test . --no-cache
-        docker run --rm internal-source-load:test
 
+    # Code image
     - name: Build production Docker image
       run: docker build --target runtime -t internal-source-load:latest .
 
+    - name: Save Docker image to tar file
+      run: docker save -o internal-source-load.tar internal-source-load:latest
+
+    - name: Upload Docker image tar file
+      uses: actions/upload-artifact@v4
+      with:
+        name: internal-source-load-tar
+        path: internal-source-load.tar
+
+    # Database image
     - name: Build Database Docker image
       run: docker build --build-arg DB_PASSWORD=root -t database:latest -f Database .
 
@@ -36,11 +55,3 @@ jobs:
         name: database-tar
         path: database.tar
 
-    - name: Save Docker image to tar file
-      run: docker save -o internal-source-load.tar internal-source-load:latest
-
-    - name: Upload Docker image tar file
-      uses: actions/upload-artifact@v4
-      with:
-        name: internal-source-load-tar
-        path: internal-source-load.tar
