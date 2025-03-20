@@ -13,3 +13,7 @@ RUN ["/usr/local/bin/docker-entrypoint.sh", "mysqld"]
 FROM mariadb:10.5
 
 COPY --from=dumper /var/lib/mysql /var/lib/mysql
+
+ENV MARIADB_ROOT_HOST=%
+
+EXPOSE 3306
