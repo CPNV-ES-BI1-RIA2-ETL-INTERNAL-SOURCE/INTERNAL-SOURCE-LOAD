@@ -1,248 +1,135 @@
-﻿using System.Text.Json;
-using INTERNAL_SOURCE_LOAD;
+﻿using INTERNAL_SOURCE_LOAD;
 using INTERNAL_SOURCE_LOAD.Controllers;
+using INTERNAL_SOURCE_LOAD.Models;
+using INTERNAL_SOURCE_LOAD.Services;
+using INTERNAL_SOURCE_LOAD_TEST.TestData;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using NUnit.Framework.Legacy;
-
+using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace INTERNAL_SOURCE_LOAD_TEST
 {
   [TestFixture]
-  public class TrainJsonToSqlTransformerTests
+  public class LoadControllerTests
   {
-  //  private TrainJsonToSqlTransformer _transformer;
-  //  private LoadController _controller;
+    private Mock<IServiceProvider> _serviceProviderMock = null!;
+    private Mock<IOptions<AppSettings>> _appSettingsMock = null!;
+    private Mock<IDatabaseExecutor> _sqlExecutorMock = null!;
+    private Mock<IJsonToModelTransformer<TrainStation>> _transformerMock = null!;
+    private LoadController _controller = null!;
+    private TrainStation _mockTrainStation = null!;
+    private List<(string, object)> _mockSqlQueries = null!;
 
-  //  [SetUp]
-  //  public void Setup()
-  //  {
-  //    _transformer = new TrainJsonToSqlTransformer();
-  //    List<IJsonToSqlTransformer> transformers = new List<IJsonToSqlTransformer> { new TrainJsonToSqlTransformer() };
-  //    _controller = new LoadController(transformers);
-  //  }
+    private Exception CreateMySqlException(int errorCode, string message)
+    {
+      return new Exception(message, new Exception($"MySQL Error Code: {errorCode}"));
+    }
 
-  //  [Test]
-  //  public void CanHandle_ValidJsonStructure_ReturnsTrue()
-  //  {
-  //    // Arrange
-  //    var jsonString = @"
-  //  {
-  //    ""name"": ""Yverdon-les-Bains"",
-  //    ""departures"": [
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Lausanne"",
-  //        ""viaStationNames"": [
-  //          """"
-  //        ],
-  //        ""departureTime"": ""2024-12-09T08:00:00"",
-  //        ""train"": {
-  //          ""g"": ""IC"",
-  //          ""l"": ""5""
-  //        },
-  //        ""platform"": ""2"",
-  //        ""sector"": null
-  //      },
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Fribourg/Freiburg"",
-  //        ""viaStationNames"": [
-  //          ""Yverdon-Champ Pittet"",
-  //          ""Yvonand"",
-  //          ""Cheyres"",
-  //          ""Payerne""
-  //        ],
-  //        ""departureTime"": ""2024-12-09T13:18:00"",
-  //        ""train"": {
-  //          ""g"": ""S"",
-  //          ""l"": ""30""
-  //        },
-  //        ""platform"": ""3"",
-  //        ""sector"": ""D""
-  //      },
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Genève Aéroport"",
-  //        ""viaStationNames"": [
-  //          ""Morges""
-  //        ],
-  //        ""departureTime"": ""2024-12-09T16:45:00"",
-  //        ""train"": {
-  //          ""g"": ""IC"",
-  //          ""l"": ""5""
-  //        },
-  //        ""platform"": ""2"",
-  //        ""sector"": null
-  //      },
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Rorschar"",
-  //        ""viaStationNames"": [
-  //          ""Neuchâtel"",
-  //          ""Biel/Bienne"",
-  //          ""Olten"",
-  //          ""St. Gallen""
-  //        ],
-  //        ""departureTime"": ""2024-12-09T23:00:00"",
-  //        ""train"": {
-  //          ""g"": ""IC"",
-  //          ""l"": ""5""
-  //        },
-  //        ""platform"": ""1"",
-  //        ""sector"": null
-  //      }
-  //    ]
-  //  }";
+    [SetUp]
+    public void Setup()
+    {
+      _serviceProviderMock = new Mock<IServiceProvider>();
+      _appSettingsMock = new Mock<IOptions<AppSettings>>();
+      _sqlExecutorMock = new Mock<IDatabaseExecutor>();
+      _transformerMock = new Mock<IJsonToModelTransformer<TrainStation>>();
 
-  //    var jsonDocument = JsonDocument.Parse(jsonString);
-  //    var jsonElement = jsonDocument.RootElement;
+      _appSettingsMock.Setup(x => x.Value).Returns(new AppSettings
+      {
+        DefaultModel = typeof(TrainStation).AssemblyQualifiedName
+      });
 
-  //    // Act
-  //    var result = _transformer.CanHandle(jsonElement);
+      // Mock the GetService method to return our mocked transformer
+      _serviceProviderMock
+        .Setup(x => x.GetService(It.Is<Type>(t => t.Name.Contains("IJsonToModelTransformer"))))
+        .Returns(_transformerMock.Object);
 
-  //    // Assert
-  //    ClassicAssert.True(result);
-  //  }
-  //  [Test]
-  //  public void Transform_ValidJson_ReturnsExpectedSql()
-  //  {
-  //    // Arrange
-  //    var jsonString = @"
-  //  {
-  //    ""name"": ""Yverdon-les-Bains"",
-  //    ""departures"": [
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Lausanne"",
-  //        ""viaStationNames"": [
-  //          """"
-  //        ],
-  //        ""departureTime"": ""2024-12-09T08:00:00"",
-  //        ""train"": {
-  //          ""g"": ""IC"",
-  //          ""l"": ""5""
-  //        },
-  //        ""platform"": ""2"",
-  //        ""sector"": null
-  //      },
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Fribourg/Freiburg"",
-  //        ""viaStationNames"": [
-  //          ""Yverdon-Champ Pittet"",
-  //          ""Yvonand"",
-  //          ""Cheyres"",
-  //          ""Payerne""
-  //        ],
-  //        ""departureTime"": ""2024-12-09T13:18:00"",
-  //        ""train"": {
-  //          ""g"": ""S"",
-  //          ""l"": ""30""
-  //        },
-  //        ""platform"": ""3"",
-  //        ""sector"": ""D""
-  //      }
-  //    ]
-  //  }";
+      // Create a mock train station object for the transformer to return
+      _mockTrainStation = TrainStationTestData.GetSimpleTrainStation().Station;
 
-  //    var expectedSql =
-  //        "INSERT INTO TrainDepartures (DepartureStationName, DestinationStationName, ViaStationNames, DepartureTime, TrainGroup, TrainLine, Platform, Sector) " +
-  //        "VALUES ('Yverdon-les-Bains', 'Lausanne', '', '2024-12-09 08:00:00', 'IC', '5', '2', NULL);\n" +
-  //        "INSERT INTO TrainDepartures (DepartureStationName, DestinationStationName, ViaStationNames, DepartureTime, TrainGroup, TrainLine, Platform, Sector) " +
-  //        "VALUES ('Yverdon-les-Bains', 'Fribourg/Freiburg', 'Yverdon-Champ Pittet,Yvonand,Cheyres,Payerne', '2024-12-09 13:18:00', 'S', '30', '3', 'D');";
+      // Mock the transformer's Transform method
+      _transformerMock
+        .Setup(x => x.Transform(It.IsAny<JsonElement>()))
+        .Returns(_mockTrainStation);
 
-  //    var jsonDocument = JsonDocument.Parse(jsonString);
-  //    var jsonElement = jsonDocument.RootElement;
+      // Create mock SQL queries that would be returned by SqlInsertGenerator
+      _mockSqlQueries = new List<(string, object)>
+      {
+          ("INSERT INTO Trains (G, L) VALUES ('ICE', 'DB123');", _mockTrainStation.Departures[0].Train),
+          ("INSERT INTO Departures (DepartureStationName, DestinationStationName, Platform) VALUES ('Berlin', 'Munich', '1');", _mockTrainStation.Departures[0]),
+          ("INSERT INTO TrainStations (Name) VALUES ('Berlin Hbf');", _mockTrainStation)
+      };
 
-  //    var transformer = new TrainJsonToSqlTransformer();
+      _controller = new LoadController(
+        _serviceProviderMock.Object,
+        _appSettingsMock.Object,
+        _sqlExecutorMock.Object
+      );
+    }
 
-  //    // Act
-  //    var result = transformer.Transform(jsonElement);
+    [Test]
+    public void Post_WhenDuplicateData_SkipsAndContinues()
+    {
+      // Arrange
+      var jsonData = TrainStationTestData.GetValidTrainStationJson();
 
-  //    // Assert
-  //    //ClassicAssert.AreEqual(expectedSql, result);
-  //    Assert.That(expectedSql, Is.EqualTo(result));
-  //  }
-  //  [Test]
-  //  public void Post_ValidJson_UsesTrainJsonToSqlTransformerAndReturns201()
-  //  {
-  //    // Arrange
-  //    var jsonString = @"
-  //          {
-  //            ""name"": ""Yverdon-les-Bains"",
-  //            ""departures"": [
-  //              {
-  //                ""departureStationName"": ""Yverdon-les-Bains"",
-  //                ""destinationStationName"": ""Lausanne"",
-  //                ""viaStationNames"": [],
-  //                ""departureTime"": ""2024-12-09T08:00:00"",
-  //                ""train"": {
-  //                  ""g"": ""IC"",
-  //                  ""l"": ""5""
-  //                },
-  //                ""platform"": ""2"",
-  //                ""sector"": null
-  //              }
-  //            ]
-  //          }";
+      // We need to mock the SqlInsertGenerator behavior indirectly since it's static
+      // This is done by intercepting the ExecuteAndReturnId call with the expected SQL query
+      _sqlExecutorMock
+        .Setup(x => x.ExecuteAndReturnId(It.Is<string>(sql => sql.Contains("INSERT"))))
+        .Throws(CreateMySqlException(1062, "Duplicate entry 'Berlin Hbf' for key 'UK_TrainStation_Name'"));
 
-  //    var jsonDocument = JsonDocument.Parse(jsonString);
-  //    var jsonElement = jsonDocument.RootElement;
+      // Act
+      var result = _controller.Post(jsonData);
 
-  //    // Act
-  //    var response = _controller.Post(jsonElement);
+      // Assert
+      Assert.That(result, Is.TypeOf<OkObjectResult>());
+      var okResult = (OkObjectResult)result;
+      Assert.That(okResult.Value?.ToString(), Does.Contain("Skipped").IgnoreCase);
+      Assert.That(okResult.Value?.ToString(), Does.Contain("duplicate").IgnoreCase);
+    }
 
-  //    // Assert
-  //    ClassicAssert.IsInstanceOf<ObjectResult>(response);
-  //    var objectResult = (ObjectResult)response;
-  //    ClassicAssert.AreEqual(StatusCodes.Status201Created, objectResult.StatusCode);
-  //    ClassicAssert.AreEqual("Data loaded successfully.", objectResult.Value);
-  //  }
-  //  [Test]
-  //  public void Post_InvalidJson_ReturnsBadRequest()
-  //  {
-  //    // Arrange
-  //    string jsonString = @"{ ""invalid"": true }";
-  //    JsonDocument jsonDocument = JsonDocument.Parse(jsonString);
-  //    JsonElement jsonElement = jsonDocument.RootElement;
+    [Test]
+    public void Post_WhenNonDuplicateData_ReturnsOk()
+    {
+      // Arrange
+      var jsonData = TrainStationTestData.GetNewTrainStationJson();
 
-  //    // Act
-  //    var response = _controller.Post(jsonElement);
+      // Setup the mock to return success for each database operation
+      _sqlExecutorMock
+        .Setup(x => x.ExecuteAndReturnId(It.IsAny<string>()))
+        .Returns(1);
 
-  //    // Assert
-  //    ClassicAssert.IsInstanceOf<BadRequestObjectResult>(response);
-  //    var badRequestResult = (BadRequestObjectResult)response;
-  //    ClassicAssert.AreEqual(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
-  //    ClassicAssert.AreEqual("No suitable transformer found for the provided data.", badRequestResult.Value);
-  //  }
-  //  [Test]
-  //  public void Post_ExceptionDuringProcessing_ReturnsInternalServerError()
-  //  {
-  //    // Arrange
-  //    var transformerMock = new Mock<IJsonToSqlTransformer>();
-  //    transformerMock.Setup(t => t.CanHandle(It.IsAny<JsonElement>())).Returns(true);
-  //    transformerMock.Setup(t => t.Transform(It.IsAny<JsonElement>())).Throws(new Exception("Unexpected error"));
+      _sqlExecutorMock
+        .Setup(x => x.Execute(It.IsAny<string>()))
+        .Verifiable();
 
-  //    var controller = new LoadController(new List<IJsonToSqlTransformer> { transformerMock.Object });
+      // Act
+      var result = _controller.Post(jsonData);
 
-  //    var jsonString = @"
-  //      {
-  //        ""name"": ""Yverdon-les-Bains"",
-  //        ""departures"": []
-  //      }";
+      // Assert
+      Assert.That(result, Is.TypeOf<OkObjectResult>());
+      var okResult = (OkObjectResult)result;
+      Assert.That(okResult.Value?.ToString(), Does.Contain("processed").IgnoreCase);
+    }
 
-  //    var jsonDocument = JsonDocument.Parse(jsonString);
-  //    var jsonElement = jsonDocument.RootElement;
+    [Test]
+    public void Post_WhenOtherDatabaseError_ReturnsInternalServerError()
+    {
+      // Arrange
+      var jsonData = TrainStationTestData.GetEmptyTrainStationJson();
 
-  //    // Act
-  //    var response = controller.Post(jsonElement);
+      _sqlExecutorMock
+        .Setup(x => x.ExecuteAndReturnId(It.IsAny<string>()))
+        .Throws(CreateMySqlException(1213, "Deadlock found when trying to get lock"));
 
-  //    // Assert
-  //    ClassicAssert.IsInstanceOf<ObjectResult>(response);
-  //    var objectResult = (ObjectResult)response;
-  //    ClassicAssert.AreEqual(StatusCodes.Status500InternalServerError, objectResult.StatusCode);
-  //    ClassicAssert.AreEqual("Error loading data: Unexpected error", objectResult.Value);
-  //  }
+      // Act
+      var result = _controller.Post(jsonData);
+
+      // Assert
+      Assert.That(result, Is.TypeOf<ObjectResult>());
+      var objectResult = (ObjectResult)result;
+      Assert.That(objectResult.StatusCode, Is.EqualTo(StatusCodes.Status500InternalServerError));
+    }
   }
 }
