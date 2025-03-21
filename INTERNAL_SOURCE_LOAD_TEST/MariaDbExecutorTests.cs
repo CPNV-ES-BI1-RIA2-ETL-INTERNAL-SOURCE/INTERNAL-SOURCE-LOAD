@@ -1,19 +1,16 @@
-﻿using System.Text.Json;
-using INTERNAL_SOURCE_LOAD;
-using INTERNAL_SOURCE_LOAD.Controllers;
+﻿using System;
+using Moq;
 using INTERNAL_SOURCE_LOAD.Services;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
+using NUnit.Framework;
+using INTERNAL_SOURCE_LOAD_TEST.TestData;
 using MySql.Data.MySqlClient;
-using NUnit.Framework.Legacy;
-
 
 namespace INTERNAL_SOURCE_LOAD_TEST
 {
-  [TestFixture]
-  public class MariaDbExecutorTests
+    [TestFixture]
+    public class MariaDbExecutorTests
     {
-        private Mock<IDatabaseExecutor> _mockExecutor;
+        private Mock<IDatabaseExecutor> _mockExecutor = null!;
 
         [SetUp]
         public void SetUp()
@@ -26,7 +23,7 @@ namespace INTERNAL_SOURCE_LOAD_TEST
         public void Execute_ValidQuery_ShouldCallExecuteOnce()
         {
             // GIVEN: A valid SQL query
-            var sqlQuery = "INSERT INTO test_table (name) VALUES ('Test Name');";
+            var sqlQuery = DatabaseTestData.GetValidInsertQuery();
 
             // WHEN: The Execute method is called
             _mockExecutor.Object.Execute(sqlQuery);
@@ -39,7 +36,7 @@ namespace INTERNAL_SOURCE_LOAD_TEST
         public void ExecuteAndReturnId_ValidQuery_ShouldReturnMockedId()
         {
             // GIVEN: A valid SQL query and a mocked ID
-            var sqlQuery = "INSERT INTO test_table (name) VALUES ('Another Test Name');";
+            var sqlQuery = DatabaseTestData.GetAnotherValidInsertQuery();
             var expectedId = 123;
 
             _mockExecutor.Setup(executor => executor.ExecuteAndReturnId(sqlQuery)).Returns(expectedId);
@@ -58,16 +55,31 @@ namespace INTERNAL_SOURCE_LOAD_TEST
         public void Execute_InvalidQuery_ShouldThrowException()
         {
             // GIVEN: An invalid SQL query
-            var invalidQuery = "INSERT INTO non_existing_table (name) VALUES ('Invalid Test');";
+            var invalidQuery = DatabaseTestData.GetInvalidInsertQuery();
+            var errorMessage = DatabaseTestData.GetInvalidQueryErrorMessage();
 
-            _mockExecutor.Setup(executor => executor.Execute(invalidQuery)).Throws(new Exception("Invalid query"));
+            _mockExecutor.Setup(executor => executor.Execute(invalidQuery)).Throws(new Exception(errorMessage));
 
             // WHEN & THEN: An exception should be thrown
             var ex = Assert.Throws<Exception>(() => _mockExecutor.Object.Execute(invalidQuery));
-            Assert.That(ex.Message, Is.EqualTo("Invalid query"), "The exception message should match the mocked exception.");
+            Assert.That(ex.Message, Is.EqualTo(errorMessage), "The exception message should match the mocked exception.");
 
             // Verify the method is called exactly once
             _mockExecutor.Verify(executor => executor.Execute(invalidQuery), Times.Once, "The Execute method should be called exactly once.");
+        }
+
+        [Test]
+        public void MariaDbExecutor_ConnectionString_ShouldCreateProperInstance()
+        {
+            // GIVEN: A connection string
+            var connectionString = "Server=localhost;Database=test;User=root;Password=password;";
+
+            // WHEN: Creating a MariaDbExecutor
+            var executor = new MariaDbExecutor(connectionString);
+
+            // THEN: The executor should not be null
+            Assert.That(executor, Is.Not.Null);
+            Assert.That(executor, Is.InstanceOf<IDatabaseExecutor>());
         }
     }
 }
