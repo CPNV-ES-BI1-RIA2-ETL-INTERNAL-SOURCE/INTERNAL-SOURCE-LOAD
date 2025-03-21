@@ -1,0 +1,6 @@
+@INTERNAL_SOURCE_LOAD_HostAddress = http://localhost:5054
+
+GET {{INTERNAL_SOURCE_LOAD_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

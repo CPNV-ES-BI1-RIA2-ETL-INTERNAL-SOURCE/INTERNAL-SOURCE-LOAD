@@ -1,0 +1,24 @@
+@startuml
+
+actor Client
+
+' Define the controller and its collaborators
+participant "LoadController" as Controller
+participant "IJsonToSqlTransformer" as Transformer
+participant "ISqlExecutor" as Executor
+
+' Sequence flow
+Client -> Controller : POST /load (jsonData)
+Controller -> Transformer : CanHandle(jsonData)
+alt Transformer can handle jsonData
+    Controller -> Transformer : Transform(jsonData)
+    Transformer -> Transformer : GenerateSql()
+    Transformer --> Controller : SQL Query
+    Controller -> Executor : Execute(sqlQuery)
+    Executor --> Controller : bool
+    Controller --> Client : 201 Created
+else No suitable transformer
+    Controller --> Client : 400 Bad Request
+end
+
+@enduml

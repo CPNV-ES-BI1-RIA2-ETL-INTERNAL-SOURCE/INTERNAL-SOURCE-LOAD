@@ -1,0 +1,74 @@
+@startuml
+
+    class LoadController {
+        - _serviceProvider : IServiceProvider 
+        - _appSettings : AppSettings
+        - _sqlExecutor :  IDatabaseExecutor 
+        + LoadController(serviceProvider : IServiceProvider, appSettings : IOptions<AppSettings>,sqlExecutor : IDatabaseExecutor)
+        + Post(jsonData : JsonElement ) : IActionResult
+    }
+
+    class Departure {
+        + DepartureStationName : string 
+        + DestinationStationName : string 
+        + ViaStationNames : List<string> 
+        + DepartureTime : DateTime
+        + Train : Train
+        + Platform : string
+        + Sector : string?
+        + TrainStationID : int?
+        + TrainID : int?
+    }
+
+    class Train {
+        + G : string
+        + L : string?
+    }
+
+    class TrainStation {
+        + Name : string
+        + Departures : List<Departure>
+    }
+
+    class TableNameAttribute {
+        + TableName : string
+        + TableNameAttribute(tableName : string )
+    }
+
+    interface IDatabaseExecutor {
+        + Execute(sqlQuery : string) : void
+        + ExecuteAndReturnId(sqlQuery : string) : long
+    }
+    class MariaDbExecutor {
+        - _connectionString : string
+        + MariaDbExecutor(connectionString : string )
+        + Execute(sqlQuery : string ) : void
+        + ExecuteAndReturnId(sqlQuery : string ) : long
+    }
+
+    interface IJsonToModelTransformer<T> {
+        + Transform(jsonData : JsonElement) : T
+    }
+
+    class JsonToModelTransformer<T> {
+        + Transform(jsonData : JsonElement) : T
+    }
+
+    class SqlInsertGenerator {
+        + GenerateInsertQueries(tableName : string , data : object ) : List<(string, object)> 
+        + GenerateUpdateForeignKeysQueries(model : object , modelIds : Dictionary<object, long>) : List<string>
+    }
+
+    TrainStation --o Departure
+    Departure --o Train
+    MariaDbExecutor --|> IDatabaseExecutor
+    LoadController --* IDatabaseExecutor
+    LoadController --* IJsonToModelTransformer
+    LoadController --* AppSettings
+    LoadController --> SqlInsertGenerator
+    TableNameAttribute *-- Departure
+    TableNameAttribute *-- Train
+    TableNameAttribute *-- TrainStation
+    JsonToModelTransformer --|> IJsonToModelTransformer
+
+@enduml

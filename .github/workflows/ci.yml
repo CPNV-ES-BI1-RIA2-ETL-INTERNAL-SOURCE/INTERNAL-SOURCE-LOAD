@@ -1,0 +1,64 @@
+  # This workflow will build a .NET project
+  # For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+  name: 'Prevent main from untested code'
+
+  on:
+    push:
+      branches: [ "main", "master", "develop", "release/**" ]
+
+  jobs:
+    test:
+        runs-on: ubuntu-latest 
+        steps:
+        - name: Checkout code
+          uses: actions/checkout@v4
+          
+        - name: Build and test Docker image
+          run: | 
+            docker build --target test -f Dockerfile -t internal-source-load:test . --no-cache
+            docker run --rm internal-source-load:test
+
+   # Publish code artifact for production only on main  
+    publish-code-artifact: 
+      runs-on: ubuntu-latest
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build production Docker image
+        run: docker build --target runtime -t internal-source-load:latest .
+
+      - name: Save Docker image to tar file
+        run: docker save -o internal-source-load.tar internal-source-load:latest
+
+      - name: Upload Docker image tar file
+        uses: actions/upload-artifact@v4
+        with:
+          name: internal-source-load-tar
+          path: internal-source-load.tar
+
+   # Publish db artifact for production only on main  
+    publish-db-artifact:
+      runs-on: ubuntu-latest
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+        env:
+          DB_PASSWORD: ${{ secrets.DB_PASSWORD_ROOT }}
+
+      - name: Build Database Docker image
+        run: docker build --build-arg DB_PASSWORD="$DB_PASSWORD" -t database:latest -f Database .
+
+      - name: Save Database Docker image to tar file
+        run: docker save -o database.tar database:latest
+
+      - name: Upload Database Docker image tar file
+        uses: actions/upload-artifact@v4
+        with:
+          name: database-tar
+          path: database.tar
+
