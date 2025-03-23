@@ -1,4 +1,8 @@
 using MySql.Data.MySqlClient;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Data.Common;
 
 namespace INTERNAL_SOURCE_LOAD.Services
 {
@@ -55,11 +59,33 @@ namespace INTERNAL_SOURCE_LOAD.Services
                             modelIds[modelInstance] = insertedId;
                         }
                     }
+                    catch (MySqlException ex) when (ex.Number == 1062)
+                    {
+                        // Just skip this record and continue with others
+                        skippedDuplicates.Add(ex.Message);
+                        result.SkippedDuplicates++;
+                        continue;
+                    }
+                    catch (DbException ex) when (ex.Message.Contains("Duplicate entry"))
+                    {
+                        // Handle other database providers with duplicate entries
+                        skippedDuplicates.Add(ex.Message);
+                        result.SkippedDuplicates++;
+                        continue;
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("Database operation failed"))
+                    {
+                        // Handle database operation failures from MariaDbExecutor
+                        result.Success = false;
+                        result.Message = ex.Message;
+                        result.Errors.Add(ex.Message);
+                        throw;
+                    }
                     catch (Exception ex)
                     {
+                        // Check if it's a wrapped DB exception for testing scenarios
                         if (IsDuplicateKeyError(ex))
                         {
-                            // Just skip this record and continue with others
                             skippedDuplicates.Add(ex.Message);
                             result.SkippedDuplicates++;
                             continue;
@@ -80,11 +106,33 @@ namespace INTERNAL_SOURCE_LOAD.Services
                     {
                         _sqlExecutor.Execute(query);
                     }
+                    catch (MySqlException ex) when (ex.Number == 1062)
+                    {
+                        // Skip duplicate foreign key updates
+                        skippedDuplicates.Add(ex.Message);
+                        result.SkippedDuplicates++;
+                        continue;
+                    }
+                    catch (DbException ex) when (ex.Message.Contains("Duplicate entry"))
+                    {
+                        // Handle other database providers with duplicate entries
+                        skippedDuplicates.Add(ex.Message);
+                        result.SkippedDuplicates++;
+                        continue;
+                    }
+                    catch (InvalidOperationException ex) when (ex.Message.Contains("Database operation failed"))
+                    {
+                        // Handle database operation failures from MariaDbExecutor
+                        result.Success = false;
+                        result.Message = ex.Message;
+                        result.Errors.Add(ex.Message);
+                        throw;
+                    }
                     catch (Exception ex)
                     {
+                        // Check if it's a wrapped DB exception for testing scenarios
                         if (IsDuplicateKeyError(ex))
                         {
-                            // Skip duplicate foreign key updates
                             skippedDuplicates.Add(ex.Message);
                             result.SkippedDuplicates++;
                             continue;
@@ -101,11 +149,48 @@ namespace INTERNAL_SOURCE_LOAD.Services
 
                 return result;
             }
+            catch (ArgumentNullException ex)
+            {
+                result.Success = false;
+                result.Message = $"Invalid input: {ex.Message}";
+                result.Errors.Add(ex.Message);
+                return result;
+            }
+            catch (ArgumentException ex)
+            {
+                result.Success = false;
+                result.Message = $"Invalid argument: {ex.Message}";
+                result.Errors.Add(ex.Message);
+                return result;
+            }
+            catch (MySqlException ex) when (ex.Number == 1062)
+            {
+                // Even at this level, just report it as a success with skipped items
+                result.Message = $"Data processed, some duplicate entries were skipped: {ex.Message}";
+                result.SkippedDuplicates++;
+                return result;
+            }
+            catch (DbException ex) when (ex.Message.Contains("Duplicate entry"))
+            {
+                // Handle other database providers with duplicate entries
+                result.Message = $"Data processed, some duplicate entries were skipped: {ex.Message}";
+                result.SkippedDuplicates++;
+                return result;
+            }
+            catch (InvalidOperationException ex) when (ex.Message.StartsWith("Database operation") ||
+                                                      ex.Message.StartsWith("Failed to get last inserted ID") ||
+                                                      ex.Message.StartsWith("Failed to convert database ID"))
+            {
+                result.Success = false;
+                result.Message = $"Database error: {ex.Message}";
+                result.Errors.Add(ex.Message);
+                return result;
+            }
             catch (Exception ex)
             {
+                // Keep this as a last resort for any other exceptions
                 if (IsDuplicateKeyError(ex))
                 {
-                    // Even at this level, just report it as a success with skipped items
                     result.Message = $"Data processed, some duplicate entries were skipped: {ex.Message}";
                     result.SkippedDuplicates++;
                     return result;
