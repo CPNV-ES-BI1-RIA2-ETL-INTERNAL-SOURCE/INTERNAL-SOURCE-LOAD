@@ -3,6 +3,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using System.Data.Common;
+using MySql.Data.MySqlClient;
 
 namespace INTERNAL_SOURCE_LOAD.Controllers;
 
@@ -49,16 +51,38 @@ public class LoadController : ControllerBase
                 return StatusCode(StatusCodes.Status500InternalServerError, result.Message);
             }
         }
+        catch (ArgumentNullException ex)
+        {
+            return BadRequest($"Required parameter missing: {ex.Message}");
+        }
         catch (ArgumentException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest($"Invalid argument: {ex.Message}");
+        }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("Database") ||
+                                                  ex.Message.StartsWith("Failed to"))
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, $"Database error: {ex.Message}");
         }
         catch (InvalidOperationException ex)
         {
-            return BadRequest(ex.Message);
+            return BadRequest($"Operation failed: {ex.Message}");
+        }
+        catch (JsonException ex)
+        {
+            return BadRequest($"JSON parsing error: {ex.Message}");
+        }
+        catch (MySqlException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, $"Database error: {ex.Message}");
+        }
+        catch (DbException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, $"Database error: {ex.Message}");
         }
         catch (Exception ex)
         {
+            // Last resort fallback for any unhandled exceptions
             return StatusCode(StatusCodes.Status500InternalServerError, $"Error processing data: {ex.Message}");
         }
     }
