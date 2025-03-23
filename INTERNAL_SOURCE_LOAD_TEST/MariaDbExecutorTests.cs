@@ -58,11 +58,13 @@ namespace INTERNAL_SOURCE_LOAD_TEST
             var invalidQuery = DatabaseTestData.GetInvalidInsertQuery();
             var errorMessage = DatabaseTestData.GetInvalidQueryErrorMessage();
 
-            _mockExecutor.Setup(executor => executor.Execute(invalidQuery)).Throws(new Exception(errorMessage));
+            _mockExecutor.Setup(executor => executor.Execute(invalidQuery))
+                .Throws(new InvalidOperationException($"Database operation failed: {errorMessage}"));
 
             // WHEN & THEN: An exception should be thrown
-            var ex = Assert.Throws<Exception>(() => _mockExecutor.Object.Execute(invalidQuery));
-            Assert.That(ex.Message, Is.EqualTo(errorMessage), "The exception message should match the mocked exception.");
+            var ex = Assert.Throws<InvalidOperationException>(() => _mockExecutor.Object.Execute(invalidQuery));
+            Assert.That(ex.Message, Does.Contain(errorMessage), "The exception message should contain the error message.");
+            Assert.That(ex.Message, Does.Contain("Database operation failed"), "The exception should be a database operation error.");
 
             // Verify the method is called exactly once
             _mockExecutor.Verify(executor => executor.Execute(invalidQuery), Times.Once, "The Execute method should be called exactly once.");
@@ -80,6 +82,23 @@ namespace INTERNAL_SOURCE_LOAD_TEST
             // THEN: The executor should not be null
             Assert.That(executor, Is.Not.Null);
             Assert.That(executor, Is.InstanceOf<IDatabaseExecutor>());
+        }
+
+        // Add test for the new specific error handling
+        [Test]
+        public void ExecuteAndReturnId_NullResult_ShouldThrowInvalidOperationException()
+        {
+            // GIVEN: A query that would return null
+            var sqlQuery = DatabaseTestData.GetValidInsertQuery();
+
+            _mockExecutor.Setup(executor => executor.ExecuteAndReturnId(sqlQuery))
+                .Throws(new InvalidOperationException("Failed to get last inserted ID"));
+
+            // WHEN & THEN: The correct exception type should be thrown
+            var ex = Assert.Throws<InvalidOperationException>(() => _mockExecutor.Object.ExecuteAndReturnId(sqlQuery));
+            Assert.That(ex.Message, Is.EqualTo("Failed to get last inserted ID"));
+
+            _mockExecutor.Verify(executor => executor.ExecuteAndReturnId(sqlQuery), Times.Once);
         }
     }
 }
