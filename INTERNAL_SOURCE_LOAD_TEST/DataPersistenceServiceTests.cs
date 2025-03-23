@@ -2,6 +2,7 @@ using INTERNAL_SOURCE_LOAD.Models;
 using INTERNAL_SOURCE_LOAD.Services;
 using INTERNAL_SOURCE_LOAD_TEST.TestData;
 using MySql.Data.MySqlClient;
+using System;
 
 namespace INTERNAL_SOURCE_LOAD_TEST
 {
@@ -31,7 +32,8 @@ namespace INTERNAL_SOURCE_LOAD_TEST
 
         private Exception CreateOtherDatabaseException()
         {
-            return new Exception("Database connection error");
+            // Now using InvalidOperationException for database errors
+            return new InvalidOperationException("Database operation failed: Database connection error");
         }
 
         [SetUp]
@@ -135,7 +137,7 @@ namespace INTERNAL_SOURCE_LOAD_TEST
 
             // Assert
             Assert.That(result.Success, Is.False);
-            Assert.That(result.Message, Does.Contain("Error processing data"));
+            Assert.That(result.Message, Does.Contain("Database error"));
             Assert.That(result.Errors.Count, Is.GreaterThan(0));
         }
 
@@ -177,6 +179,26 @@ namespace INTERNAL_SOURCE_LOAD_TEST
 
             // Assert
             Assert.That(result, Is.False);
+        }
+
+        // Add test for the new InvalidOperationException database error handling
+        [Test]
+        public void PersistData_GetLastInsertIdError_ReturnsErrorResult()
+        {
+            // Arrange
+            string modelTypeName = typeof(TrainStation).AssemblyQualifiedName!;
+
+            _databaseExecutorMock
+                .Setup(x => x.ExecuteAndReturnId(It.IsAny<string>()))
+                .Throws(new InvalidOperationException("Failed to get last inserted ID"));
+
+            // Act
+            var result = _service.PersistData(_mockTrainStation, modelTypeName);
+
+            // Assert
+            Assert.That(result.Success, Is.False);
+            Assert.That(result.Message, Does.Contain("Database error"));
+            Assert.That(result.Errors.Count, Is.GreaterThan(0));
         }
     }
 }
