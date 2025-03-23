@@ -64,7 +64,7 @@ namespace INTERNAL_SOURCE_LOAD_TEST
             string invalidTypeName = "INTERNAL_SOURCE_LOAD.Models.NonExistentModel, INTERNAL-SOURCE-LOAD";
 
             // Act & Assert
-            var exception = Assert.Throws<ArgumentException>(() =>
+            var exception = Assert.Throws<TypeLoadException>(() =>
                 _service.TransformJsonToModel(jsonElement, invalidTypeName));
 
             Assert.That(exception.Message, Does.Contain("not found"));
@@ -88,7 +88,7 @@ namespace INTERNAL_SOURCE_LOAD_TEST
             var exception = Assert.Throws<InvalidOperationException>(() =>
                 _service.TransformJsonToModel(jsonElement, modelTypeName));
 
-            Assert.That(exception.Message, Does.Contain("No transformer found"));
+            Assert.That(exception.Message, Does.Contain("No transformer registered"));
         }
 
         [Test]
