@@ -44,7 +44,7 @@ namespace INTERNAL_SOURCE_LOAD_TEST
 
             // Act & Assert
             var ex = Assert.Throws<ArgumentException>(() => _transformer.Transform(invalidJson));
-            Assert.That(ex.Message, Is.EqualTo("Invalid JSON payload."));
+            Assert.That(ex.Message, Does.StartWith("Invalid JSON payload: data cannot be null or undefined."));
         }
 
         [Test]
