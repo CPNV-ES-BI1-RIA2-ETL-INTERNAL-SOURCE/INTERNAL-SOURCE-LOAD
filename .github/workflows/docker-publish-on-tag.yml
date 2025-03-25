@@ -29,9 +29,18 @@ jobs:
       run: |
         echo "TAG_NAME=${GITHUB_REF#refs/tags/}" >> $GITHUB_ENV
 
-    - name: Build and push Docker image with tag
+    - name: Build and push Docker service image with tag
       uses: docker/build-push-action@v5
       with:
         context: .
+        file: ./Dockerfile.service
         push: true
         tags: ${{ secrets.DOCKER_USERNAME }}/ria2-load:${{ env.TAG_NAME }}
+
+    - name: Build and push Docker database image with tag
+      uses: docker/build-push-action@v5
+      with:
+        context: .
+        file: ./Dockerfile.database
+        push: true
+        tags: ${{ secrets.DOCKER_USERNAME }}/ria2-database:${{ env.TAG_NAME }}
