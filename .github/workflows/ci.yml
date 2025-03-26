@@ -28,7 +28,7 @@
         uses: actions/checkout@v4
 
       - name: Build production Docker image
-        run: docker build --target runtime -t internal-source-load:latest .
+        run: docker build --target runtime -t internal-source-load:latest -f Dockerfile.service .
 
       - name: Save Docker image to tar file
         run: docker save -o internal-source-load.tar internal-source-load:latest
