@@ -26,7 +26,8 @@ dotnet build
 
 _With Docker_
 ```shell
-docker build --target build -t build .
+docker build -t database -f Dockerfile.database .
+docker build -t internal-source-load -f Dockerfile.service .
 ```
 
 #### Run the api locally

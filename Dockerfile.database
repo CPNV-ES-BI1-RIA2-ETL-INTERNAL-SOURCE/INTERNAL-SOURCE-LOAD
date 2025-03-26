@@ -1,19 +1,5 @@
-FROM mariadb:10.5 AS dumper
-
-ARG DB_PASSWORD
-
-COPY INTERNAL-SOURCE-LOAD/Models/DataModel.sql /docker-entrypoint-initdb.d/
-
-ENV MARIADB_ROOT_PASSWORD=${DB_PASSWORD}
-
-RUN sed -i 's/exec "$@"/echo "skipping..."/' /usr/local/bin/docker-entrypoint.sh
-
-RUN ["/usr/local/bin/docker-entrypoint.sh", "mysqld"]
-
 FROM mariadb:10.5
 
-COPY --from=dumper /var/lib/mysql /var/lib/mysql
-
-ENV MARIADB_ROOT_HOST=%
+COPY INTERNAL-SOURCE-LOAD/Models/DataModel.sql /docker-entrypoint-initdb.d/
 
 EXPOSE 3306
