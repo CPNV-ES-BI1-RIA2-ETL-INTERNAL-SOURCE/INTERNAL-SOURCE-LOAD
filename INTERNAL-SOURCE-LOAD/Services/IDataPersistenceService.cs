@@ -1,15 +1,9 @@
 using System.Collections.Generic;
+using System;
+using INTERNAL_SOURCE_LOAD.Models.DTOs;
 
 namespace INTERNAL_SOURCE_LOAD.Services
 {
-    public class PersistenceResult
-    {
-        public bool Success { get; set; }
-        public string Message { get; set; }
-        public int SkippedDuplicates { get; set; }
-        public List<string> Errors { get; set; } = new List<string>();
-    }
-
     public interface IDataPersistenceService
     {
         PersistenceResult PersistData(object model, string modelTypeName);

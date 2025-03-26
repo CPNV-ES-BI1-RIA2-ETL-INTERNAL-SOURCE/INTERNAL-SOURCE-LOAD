@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using System.Text.Json;
 using System.Data.Common;
 using MySql.Data.MySqlClient;
+using INTERNAL_SOURCE_LOAD.Models.DTOs;
 
 namespace INTERNAL_SOURCE_LOAD.Controllers;
 
