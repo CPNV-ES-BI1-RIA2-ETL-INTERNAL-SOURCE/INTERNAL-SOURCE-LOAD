@@ -1,0 +1,5 @@
+FROM mariadb:10.5
+
+COPY INTERNAL-SOURCE-LOAD/Models/DataModel.sql /docker-entrypoint-initdb.d/
+
+EXPOSE 3306

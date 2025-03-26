@@ -16,7 +16,7 @@
           
         - name: Build and test Docker image
           run: | 
-            docker build --target test -f Dockerfile -t internal-source-load:test . --no-cache
+            docker build --target test -f Dockerfile.service -t internal-source-load:test . --no-cache
             docker run --rm internal-source-load:test
 
    # Publish code artifact for production only on main  
@@ -51,7 +51,7 @@
           DB_PASSWORD: ${{ secrets.DB_PASSWORD_ROOT }}
 
       - name: Build Database Docker image
-        run: docker build --build-arg DB_PASSWORD="$DB_PASSWORD" -t database:latest -f Database .
+        run: docker build --build-arg DB_PASSWORD="$DB_PASSWORD" -t database:latest -f Dockerfile.database .
 
       - name: Save Database Docker image to tar file
         run: docker save -o database.tar database:latest

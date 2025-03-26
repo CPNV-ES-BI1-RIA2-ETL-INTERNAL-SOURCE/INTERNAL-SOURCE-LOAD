@@ -17,13 +17,38 @@ CREATE TABLE IF NOT EXISTS `Trains`
 (
     50
 ) DEFAULT NULL,
+    `Hash` varchar
+(
+    32
+) NOT NULL COMMENT 'MD5 hash of G and L (or empty string if L is null)',
     PRIMARY KEY
 (
     `Id`
-)
-    ) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4;
+),
+    UNIQUE KEY `UK_Train_Hash` (`Hash`)
+) ENGINE=InnoDB AUTO_INCREMENT=13 DEFAULT CHARSET=utf8mb4;
 
--- Les donn�es export�es n'�taient pas s�lectionn�es.
+-- Trigger to automatically generate hash before insert
+DELIMITER //
+CREATE TRIGGER before_train_insert 
+BEFORE INSERT ON Trains
+FOR EACH ROW
+BEGIN
+    SET NEW.Hash = MD5(CONCAT(NEW.G, COALESCE(NEW.L, '')));
+END//
+DELIMITER ;
+
+-- Trigger to automatically generate hash before update
+DELIMITER //
+CREATE TRIGGER before_train_update
+BEFORE UPDATE ON Trains
+FOR EACH ROW
+BEGIN
+    SET NEW.Hash = MD5(CONCAT(NEW.G, COALESCE(NEW.L, '')));
+END//
+DELIMITER ;
+
+-- Les donnes exportes n'taient pas slectionnes.
 
 -- Listage de la structure de table TrainSchedule. trainstations
 CREATE TABLE IF NOT EXISTS `TrainStations`
@@ -40,8 +65,9 @@ CREATE TABLE IF NOT EXISTS `TrainStations`
     PRIMARY KEY
 (
     `Id`
-)
-    ) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4;
+),
+    UNIQUE KEY `UK_TrainStation_Name` (`Name`)
+) ENGINE=InnoDB AUTO_INCREMENT=8 DEFAULT CHARSET=utf8mb4;
 
 
 -- Listage de la structure de table TrainSchedule. departures
@@ -82,6 +108,7 @@ CREATE TABLE IF NOT EXISTS `Departures`
 (
     `Id`
 ),
+    UNIQUE KEY `UK_Departure_Unique_Schedule` (`DepartureStationName`, `DestinationStationName`, `DepartureTime`, `Platform`),
     KEY `TrainStationId`
 (
     `TrainStationId`

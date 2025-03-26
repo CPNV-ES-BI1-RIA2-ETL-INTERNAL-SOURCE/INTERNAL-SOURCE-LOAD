@@ -1,248 +1,142 @@
-﻿using System.Text.Json;
-using INTERNAL_SOURCE_LOAD;
+﻿using INTERNAL_SOURCE_LOAD;
 using INTERNAL_SOURCE_LOAD.Controllers;
+using INTERNAL_SOURCE_LOAD.Models;
+using INTERNAL_SOURCE_LOAD.Models.DTOs;
+using INTERNAL_SOURCE_LOAD.Services;
+using INTERNAL_SOURCE_LOAD_TEST.TestData;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
-using NUnit.Framework.Legacy;
-
+using Microsoft.Extensions.Options;
+using System.Text.Json;
 
 namespace INTERNAL_SOURCE_LOAD_TEST
 {
   [TestFixture]
-  public class TrainJsonToSqlTransformerTests
+  public class LoadControllerTests
   {
-  //  private TrainJsonToSqlTransformer _transformer;
-  //  private LoadController _controller;
+    private Mock<IJsonTransformerService> _jsonTransformerServiceMock = null!;
+    private Mock<IDataPersistenceService> _dataPersistenceServiceMock = null!;
+    private Mock<IOptions<AppSettings>> _appSettingsMock = null!;
+    private LoadController _controller = null!;
+    private TrainStation _mockTrainStation = null!;
 
-  //  [SetUp]
-  //  public void Setup()
-  //  {
-  //    _transformer = new TrainJsonToSqlTransformer();
-  //    List<IJsonToSqlTransformer> transformers = new List<IJsonToSqlTransformer> { new TrainJsonToSqlTransformer() };
-  //    _controller = new LoadController(transformers);
-  //  }
+    [SetUp]
+    public void Setup()
+    {
+      _jsonTransformerServiceMock = new Mock<IJsonTransformerService>();
+      _dataPersistenceServiceMock = new Mock<IDataPersistenceService>();
+      _appSettingsMock = new Mock<IOptions<AppSettings>>();
 
-  //  [Test]
-  //  public void CanHandle_ValidJsonStructure_ReturnsTrue()
-  //  {
-  //    // Arrange
-  //    var jsonString = @"
-  //  {
-  //    ""name"": ""Yverdon-les-Bains"",
-  //    ""departures"": [
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Lausanne"",
-  //        ""viaStationNames"": [
-  //          """"
-  //        ],
-  //        ""departureTime"": ""2024-12-09T08:00:00"",
-  //        ""train"": {
-  //          ""g"": ""IC"",
-  //          ""l"": ""5""
-  //        },
-  //        ""platform"": ""2"",
-  //        ""sector"": null
-  //      },
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Fribourg/Freiburg"",
-  //        ""viaStationNames"": [
-  //          ""Yverdon-Champ Pittet"",
-  //          ""Yvonand"",
-  //          ""Cheyres"",
-  //          ""Payerne""
-  //        ],
-  //        ""departureTime"": ""2024-12-09T13:18:00"",
-  //        ""train"": {
-  //          ""g"": ""S"",
-  //          ""l"": ""30""
-  //        },
-  //        ""platform"": ""3"",
-  //        ""sector"": ""D""
-  //      },
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Genève Aéroport"",
-  //        ""viaStationNames"": [
-  //          ""Morges""
-  //        ],
-  //        ""departureTime"": ""2024-12-09T16:45:00"",
-  //        ""train"": {
-  //          ""g"": ""IC"",
-  //          ""l"": ""5""
-  //        },
-  //        ""platform"": ""2"",
-  //        ""sector"": null
-  //      },
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Rorschar"",
-  //        ""viaStationNames"": [
-  //          ""Neuchâtel"",
-  //          ""Biel/Bienne"",
-  //          ""Olten"",
-  //          ""St. Gallen""
-  //        ],
-  //        ""departureTime"": ""2024-12-09T23:00:00"",
-  //        ""train"": {
-  //          ""g"": ""IC"",
-  //          ""l"": ""5""
-  //        },
-  //        ""platform"": ""1"",
-  //        ""sector"": null
-  //      }
-  //    ]
-  //  }";
+      _appSettingsMock.Setup(x => x.Value).Returns(new AppSettings
+      {
+        DefaultModel = typeof(TrainStation).AssemblyQualifiedName
+      });
 
-  //    var jsonDocument = JsonDocument.Parse(jsonString);
-  //    var jsonElement = jsonDocument.RootElement;
+      // Create a mock train station object
+      _mockTrainStation = TrainStationTestData.GetSimpleTrainStation().Station;
 
-  //    // Act
-  //    var result = _transformer.CanHandle(jsonElement);
+      // Setup the controller with the mocked services
+      _controller = new LoadController(
+        _jsonTransformerServiceMock.Object,
+        _dataPersistenceServiceMock.Object,
+        _appSettingsMock.Object
+      );
+    }
 
-  //    // Assert
-  //    ClassicAssert.True(result);
-  //  }
-  //  [Test]
-  //  public void Transform_ValidJson_ReturnsExpectedSql()
-  //  {
-  //    // Arrange
-  //    var jsonString = @"
-  //  {
-  //    ""name"": ""Yverdon-les-Bains"",
-  //    ""departures"": [
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Lausanne"",
-  //        ""viaStationNames"": [
-  //          """"
-  //        ],
-  //        ""departureTime"": ""2024-12-09T08:00:00"",
-  //        ""train"": {
-  //          ""g"": ""IC"",
-  //          ""l"": ""5""
-  //        },
-  //        ""platform"": ""2"",
-  //        ""sector"": null
-  //      },
-  //      {
-  //        ""departureStationName"": ""Yverdon-les-Bains"",
-  //        ""destinationStationName"": ""Fribourg/Freiburg"",
-  //        ""viaStationNames"": [
-  //          ""Yverdon-Champ Pittet"",
-  //          ""Yvonand"",
-  //          ""Cheyres"",
-  //          ""Payerne""
-  //        ],
-  //        ""departureTime"": ""2024-12-09T13:18:00"",
-  //        ""train"": {
-  //          ""g"": ""S"",
-  //          ""l"": ""30""
-  //        },
-  //        ""platform"": ""3"",
-  //        ""sector"": ""D""
-  //      }
-  //    ]
-  //  }";
+    [Test]
+    public void Post_WhenDuplicateData_SkipsAndContinues()
+    {
+      // Arrange
+      var jsonElement = JsonSerializer.Deserialize<JsonElement>(
+        JsonSerializer.Serialize(TrainStationTestData.GetSimpleTrainStation())
+      );
 
-  //    var expectedSql =
-  //        "INSERT INTO TrainDepartures (DepartureStationName, DestinationStationName, ViaStationNames, DepartureTime, TrainGroup, TrainLine, Platform, Sector) " +
-  //        "VALUES ('Yverdon-les-Bains', 'Lausanne', '', '2024-12-09 08:00:00', 'IC', '5', '2', NULL);\n" +
-  //        "INSERT INTO TrainDepartures (DepartureStationName, DestinationStationName, ViaStationNames, DepartureTime, TrainGroup, TrainLine, Platform, Sector) " +
-  //        "VALUES ('Yverdon-les-Bains', 'Fribourg/Freiburg', 'Yverdon-Champ Pittet,Yvonand,Cheyres,Payerne', '2024-12-09 13:18:00', 'S', '30', '3', 'D');";
+      _jsonTransformerServiceMock
+        .Setup(x => x.TransformJsonToModel(It.IsAny<JsonElement>(), It.IsAny<string>()))
+        .Returns(_mockTrainStation);
 
-  //    var jsonDocument = JsonDocument.Parse(jsonString);
-  //    var jsonElement = jsonDocument.RootElement;
+      var persistenceResult = new PersistenceResult
+      {
+        Success = true,
+        SkippedDuplicates = 1,
+        Message = "Data processed for table: TrainStation. Skipped 1 duplicate entries."
+      };
 
-  //    var transformer = new TrainJsonToSqlTransformer();
+      _dataPersistenceServiceMock
+        .Setup(x => x.PersistData(It.IsAny<object>(), It.IsAny<string>()))
+        .Returns(persistenceResult);
 
-  //    // Act
-  //    var result = transformer.Transform(jsonElement);
+      // Act
+      var result = _controller.Post(jsonElement);
 
-  //    // Assert
-  //    //ClassicAssert.AreEqual(expectedSql, result);
-  //    Assert.That(expectedSql, Is.EqualTo(result));
-  //  }
-  //  [Test]
-  //  public void Post_ValidJson_UsesTrainJsonToSqlTransformerAndReturns201()
-  //  {
-  //    // Arrange
-  //    var jsonString = @"
-  //          {
-  //            ""name"": ""Yverdon-les-Bains"",
-  //            ""departures"": [
-  //              {
-  //                ""departureStationName"": ""Yverdon-les-Bains"",
-  //                ""destinationStationName"": ""Lausanne"",
-  //                ""viaStationNames"": [],
-  //                ""departureTime"": ""2024-12-09T08:00:00"",
-  //                ""train"": {
-  //                  ""g"": ""IC"",
-  //                  ""l"": ""5""
-  //                },
-  //                ""platform"": ""2"",
-  //                ""sector"": null
-  //              }
-  //            ]
-  //          }";
+      // Assert
+      Assert.That(result, Is.InstanceOf<OkObjectResult>());
+      var okResult = (OkObjectResult)result;
+      Assert.That(okResult.Value.ToString(), Does.Contain("Skipped 1 duplicate entries"));
+    }
 
-  //    var jsonDocument = JsonDocument.Parse(jsonString);
-  //    var jsonElement = jsonDocument.RootElement;
+    [Test]
+    public void Post_WhenNonDuplicateData_ReturnsOk()
+    {
+      // Arrange
+      var jsonElement = JsonSerializer.Deserialize<JsonElement>(
+        JsonSerializer.Serialize(TrainStationTestData.GetSimpleTrainStation())
+      );
 
-  //    // Act
-  //    var response = _controller.Post(jsonElement);
+      _jsonTransformerServiceMock
+        .Setup(x => x.TransformJsonToModel(It.IsAny<JsonElement>(), It.IsAny<string>()))
+        .Returns(_mockTrainStation);
 
-  //    // Assert
-  //    ClassicAssert.IsInstanceOf<ObjectResult>(response);
-  //    var objectResult = (ObjectResult)response;
-  //    ClassicAssert.AreEqual(StatusCodes.Status201Created, objectResult.StatusCode);
-  //    ClassicAssert.AreEqual("Data loaded successfully.", objectResult.Value);
-  //  }
-  //  [Test]
-  //  public void Post_InvalidJson_ReturnsBadRequest()
-  //  {
-  //    // Arrange
-  //    string jsonString = @"{ ""invalid"": true }";
-  //    JsonDocument jsonDocument = JsonDocument.Parse(jsonString);
-  //    JsonElement jsonElement = jsonDocument.RootElement;
+      var persistenceResult = new PersistenceResult
+      {
+        Success = true,
+        SkippedDuplicates = 0,
+        Message = "Data processed for table: TrainStation"
+      };
 
-  //    // Act
-  //    var response = _controller.Post(jsonElement);
+      _dataPersistenceServiceMock
+        .Setup(x => x.PersistData(It.IsAny<object>(), It.IsAny<string>()))
+        .Returns(persistenceResult);
 
-  //    // Assert
-  //    ClassicAssert.IsInstanceOf<BadRequestObjectResult>(response);
-  //    var badRequestResult = (BadRequestObjectResult)response;
-  //    ClassicAssert.AreEqual(StatusCodes.Status400BadRequest, badRequestResult.StatusCode);
-  //    ClassicAssert.AreEqual("No suitable transformer found for the provided data.", badRequestResult.Value);
-  //  }
-  //  [Test]
-  //  public void Post_ExceptionDuringProcessing_ReturnsInternalServerError()
-  //  {
-  //    // Arrange
-  //    var transformerMock = new Mock<IJsonToSqlTransformer>();
-  //    transformerMock.Setup(t => t.CanHandle(It.IsAny<JsonElement>())).Returns(true);
-  //    transformerMock.Setup(t => t.Transform(It.IsAny<JsonElement>())).Throws(new Exception("Unexpected error"));
+      // Act
+      var result = _controller.Post(jsonElement);
 
-  //    var controller = new LoadController(new List<IJsonToSqlTransformer> { transformerMock.Object });
+      // Assert
+      Assert.That(result, Is.InstanceOf<OkObjectResult>());
+      var okResult = (OkObjectResult)result;
+      Assert.That(okResult.Value.ToString(), Does.Contain("Data processed for table"));
+    }
 
-  //    var jsonString = @"
-  //      {
-  //        ""name"": ""Yverdon-les-Bains"",
-  //        ""departures"": []
-  //      }";
+    [Test]
+    public void Post_WhenOtherDatabaseError_ReturnsInternalServerError()
+    {
+      // Arrange
+      var jsonElement = JsonSerializer.Deserialize<JsonElement>(
+        JsonSerializer.Serialize(TrainStationTestData.GetSimpleTrainStation())
+      );
 
-  //    var jsonDocument = JsonDocument.Parse(jsonString);
-  //    var jsonElement = jsonDocument.RootElement;
+      _jsonTransformerServiceMock
+        .Setup(x => x.TransformJsonToModel(It.IsAny<JsonElement>(), It.IsAny<string>()))
+        .Returns(_mockTrainStation);
 
-  //    // Act
-  //    var response = controller.Post(jsonElement);
+      var persistenceResult = new PersistenceResult
+      {
+        Success = false,
+        Message = "Error processing data: Database connection failed"
+      };
 
-  //    // Assert
-  //    ClassicAssert.IsInstanceOf<ObjectResult>(response);
-  //    var objectResult = (ObjectResult)response;
-  //    ClassicAssert.AreEqual(StatusCodes.Status500InternalServerError, objectResult.StatusCode);
-  //    ClassicAssert.AreEqual("Error loading data: Unexpected error", objectResult.Value);
-  //  }
+      _dataPersistenceServiceMock
+        .Setup(x => x.PersistData(It.IsAny<object>(), It.IsAny<string>()))
+        .Returns(persistenceResult);
+
+      // Act
+      var result = _controller.Post(jsonElement);
+
+      // Assert
+      Assert.That(result, Is.InstanceOf<ObjectResult>());
+      var statusCodeResult = (ObjectResult)result;
+      Assert.That(statusCodeResult.StatusCode, Is.EqualTo(StatusCodes.Status500InternalServerError));
+      Assert.That(statusCodeResult.Value.ToString(), Does.Contain("Database connection failed"));
+    }
   }
 }

@@ -2,8 +2,10 @@
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using System.Collections;
 using System.Text.Json;
+using System.Data.Common;
+using MySql.Data.MySqlClient;
+using INTERNAL_SOURCE_LOAD.Models.DTOs;
 
 namespace INTERNAL_SOURCE_LOAD.Controllers;
 
@@ -11,15 +13,18 @@ namespace INTERNAL_SOURCE_LOAD.Controllers;
 [ApiController]
 public class LoadController : ControllerBase
 {
-    private readonly IServiceProvider _serviceProvider;
+    private readonly IJsonTransformerService _jsonTransformerService;
+    private readonly IDataPersistenceService _dataPersistenceService;
     private readonly AppSettings _appSettings;
-    private readonly IDatabaseExecutor _sqlExecutor;
 
-    public LoadController(IServiceProvider serviceProvider, IOptions<AppSettings> appSettings, IDatabaseExecutor sqlExecutor)
+    public LoadController(
+        IJsonTransformerService jsonTransformerService,
+        IDataPersistenceService dataPersistenceService,
+        IOptions<AppSettings> appSettings)
     {
-        _serviceProvider = serviceProvider;
+        _jsonTransformerService = jsonTransformerService;
+        _dataPersistenceService = dataPersistenceService;
         _appSettings = appSettings.Value;
-        _sqlExecutor = sqlExecutor;
     }
 
     [HttpPost]
@@ -32,64 +37,54 @@ public class LoadController : ControllerBase
 
         try
         {
-            // Resolve the target type from the configuration
-            var targetType = Type.GetType(_appSettings.DefaultModel);
-            if (targetType == null)
+            // Transform JSON to model
+            var model = _jsonTransformerService.TransformJsonToModel(jsonData, _appSettings.DefaultModel);
+
+            // Persist the data
+            var result = _dataPersistenceService.PersistData(model, _appSettings.DefaultModel);
+
+            if (result.Success)
             {
-                return BadRequest($"Model type '{_appSettings.DefaultModel}' not found.");
+                return Ok(result.Message);
             }
-
-            var transformerType = typeof(IJsonToModelTransformer<>).MakeGenericType(targetType);
-            dynamic transformer = _serviceProvider.GetService(transformerType);
-            if (transformer == null)
+            else
             {
-                return BadRequest($"No transformer found for model type: {_appSettings.DefaultModel}");
+                return StatusCode(StatusCodes.Status500InternalServerError, result.Message);
             }
-
-            // Transform JSON into the specified model type
-            var model = transformer.Transform(jsonData);
-
-            if (model == null)
-            {
-                return BadRequest("Transformation resulted in a null model.");
-            }
-
-            // Generate SQL queries
-            string tableName = targetType.Name;
-            var sqlQueries = SqlInsertGenerator.GenerateInsertQueries(tableName, model);
-
-            // Step 3: Execute insert queries and track inserted IDs
-            var modelIds = new Dictionary<object, long>();
-            foreach (var query in sqlQueries)
-            {
-                // Execute the insert query and get the inserted ID
-                var insertedId = _sqlExecutor.ExecuteAndReturnId(query.Item1);
-
-                // Map the model instance to the ID
-                var modelInstance = query.Item2;
-                if (modelInstance != null)
-                {
-                    modelIds[modelInstance] = insertedId;
-                }
-            }
-            List<string> sqlQueriesFK = new List<string>();
-            foreach (var modelInstance in modelIds.Keys)
-            {
-                sqlQueriesFK.AddRange(SqlInsertGenerator.GenerateUpdateForeignKeysQueries(modelInstance, modelIds));
-            }
-
-            foreach (var query in sqlQueriesFK)
-            {
-                _sqlExecutor.Execute(query);
-            }
-
-
-            return StatusCode(StatusCodes.Status201Created, $"Data inserted into table: {tableName}");
+        }
+        catch (ArgumentNullException ex)
+        {
+            return BadRequest($"Required parameter missing: {ex.Message}");
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest($"Invalid argument: {ex.Message}");
+        }
+        catch (InvalidOperationException ex) when (ex.Message.StartsWith("Database") ||
+                                                  ex.Message.StartsWith("Failed to"))
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, $"Database error: {ex.Message}");
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest($"Operation failed: {ex.Message}");
+        }
+        catch (JsonException ex)
+        {
+            return BadRequest($"JSON parsing error: {ex.Message}");
+        }
+        catch (MySqlException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, $"Database error: {ex.Message}");
+        }
+        catch (DbException ex)
+        {
+            return StatusCode(StatusCodes.Status503ServiceUnavailable, $"Database error: {ex.Message}");
         }
         catch (Exception ex)
         {
+            // Last resort fallback for any unhandled exceptions
             return StatusCode(StatusCodes.Status500InternalServerError, $"Error processing data: {ex.Message}");
         }
     }
-    
 }

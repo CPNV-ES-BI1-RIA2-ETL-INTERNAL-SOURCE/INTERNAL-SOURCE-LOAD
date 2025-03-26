@@ -1,0 +1,30 @@
+services:
+  load:
+    image: internal-source-load
+    container_name: "load"
+    restart: unless-stopped
+    depends_on:
+      - database
+    environment:
+      ConnectionStrings: ${LOAD_CONNECTION_STRING}
+    networks:
+      - database
+  database:
+    image: database
+    container_name: "database"
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: ${LOAD_DB_ROOT_PASSWORD}
+      MARIADB_DATABASE: ${LOAD_DB_DATABASE}
+      MARIADB_USER: ${LOAD_DB_USERNAME}
+      MARIADB_PASSWORD: ${LOAD_DB_PASSWORD}
+    ports:
+      - "3306:3306"
+    volumes:
+      - db-data:/var/lib/mysql
+    networks:
+      - database
+networks:
+  database:
+volumes:
+  db-data:

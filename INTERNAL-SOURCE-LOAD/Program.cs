@@ -13,15 +13,19 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("AppSettings")); 
+builder.Services.Configure<AppSettings>(builder.Configuration.GetSection("AppSettings"));
 builder.Services.AddTransient(typeof(IJsonToModelTransformer<>), typeof(JsonToModelTransformer<>));
+// Register our new services
+builder.Services.AddScoped<IJsonTransformerService, JsonTransformerService>();
+builder.Services.AddScoped<IDataPersistenceService, DataPersistenceService>();
+
 // Try to get the environment variable value
 foreach (var env in Environment.GetEnvironmentVariables())
 {
     Console.WriteLine(env);
 }
 
-    string connectionString = Environment.GetEnvironmentVariable("ConnectionStrings");
+string connectionString = Environment.GetEnvironmentVariable("ConnectionStrings");
 if (connectionString == null)
 {
     connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
