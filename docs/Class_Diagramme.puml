@@ -19,8 +19,6 @@
         class AppSettings {
             + DefaultModel : string
         }
-
-        note "Framework types:\n- ActionResult\n- JsonElement\n- ServiceProvider\n- Type\n- Exception" as FrameworkNote
     }
 
     ' Domain Model package

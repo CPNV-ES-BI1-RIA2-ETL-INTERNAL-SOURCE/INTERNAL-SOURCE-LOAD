@@ -2,23 +2,39 @@
 
 actor Client
 
-' Define the controller and its collaborators
+' Define all participants in the system
 participant "LoadController" as Controller
-participant "IJsonToSqlTransformer" as Transformer
-participant "ISqlExecutor" as Executor
+participant "IJsonTransformerService" as TransformerService
+participant "IJsonToModelTransformer<T>" as ModelTransformer
+participant "IDataPersistenceService" as PersistenceService
+participant "SqlInsertGenerator" as SqlGenerator
+participant "IDatabaseExecutor" as Executor
 
 ' Sequence flow
-Client -> Controller : POST /load (jsonData)
-Controller -> Transformer : CanHandle(jsonData)
-alt Transformer can handle jsonData
-    Controller -> Transformer : Transform(jsonData)
-    Transformer -> Transformer : GenerateSql()
-    Transformer --> Controller : SQL Query
-    Controller -> Executor : Execute(sqlQuery)
-    Executor --> Controller : bool
-    Controller --> Client : 201 Created
-else No suitable transformer
-    Controller --> Client : 400 Bad Request
+Client -> Controller : POST /api/v1/documents/load (jsonData)
+Controller -> TransformerService : TransformJsonToModel(jsonData, modelTypeName)
+TransformerService -> TransformerService : ResolveModelType(modelTypeName)
+TransformerService -> ModelTransformer : Transform(jsonData)
+ModelTransformer --> TransformerService : Model Object
+TransformerService --> Controller : Model Object
+
+Controller -> PersistenceService : PersistData(model, modelTypeName)
+PersistenceService -> SqlGenerator : GenerateInsertQueries(tableName, model)
+SqlGenerator --> PersistenceService : List<(string Query, object Model)>
+
+loop For each SQL query
+    PersistenceService -> Executor : ExecuteAndReturnId(query)
+    Executor --> PersistenceService : insertedId
 end
+
+PersistenceService -> SqlGenerator : GenerateUpdateForeignKeysQueries(model, modelIds)
+SqlGenerator --> PersistenceService : List<string>
+
+loop For each Foreign Key SQL query
+    PersistenceService -> Executor : Execute(query)
+end
+
+PersistenceService --> Controller : PersistenceResult
+Controller --> Client : 200 OK / Error Response
 
 @enduml
