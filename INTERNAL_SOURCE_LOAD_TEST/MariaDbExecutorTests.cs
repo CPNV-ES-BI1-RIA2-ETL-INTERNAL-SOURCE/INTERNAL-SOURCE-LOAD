@@ -1,9 +1,5 @@
-﻿using System;
-using Moq;
-using INTERNAL_SOURCE_LOAD.Services;
-using NUnit.Framework;
+﻿using INTERNAL_SOURCE_LOAD.Services;
 using INTERNAL_SOURCE_LOAD_TEST.TestData;
-using MySql.Data.MySqlClient;
 
 namespace INTERNAL_SOURCE_LOAD_TEST
 {

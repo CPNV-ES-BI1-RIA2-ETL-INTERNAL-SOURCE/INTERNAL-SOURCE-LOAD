@@ -2,7 +2,6 @@ using INTERNAL_SOURCE_LOAD;
 using INTERNAL_SOURCE_LOAD.Models;
 using INTERNAL_SOURCE_LOAD.Services;
 using INTERNAL_SOURCE_LOAD_TEST.TestData;
-using Microsoft.Extensions.DependencyInjection;
 using System.Text.Json;
 
 namespace INTERNAL_SOURCE_LOAD_TEST
