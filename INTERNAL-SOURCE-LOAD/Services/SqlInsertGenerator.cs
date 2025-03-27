@@ -131,49 +131,37 @@ namespace INTERNAL_SOURCE_LOAD.Services
             var tableName = GetTableName(modelType);
             var processedRelationships = new HashSet<string>(); // Track which foreign keys we've handled
 
-            // First handle navigation properties (e.g., Train)
             foreach (var property in modelType.GetProperties())
             {
-                if (IsSimpleType(property.PropertyType))
-                    continue;
-
-                var navigationPropertyValue = property.GetValue(model);
-                if (navigationPropertyValue == null)
-                    continue;
-
-                // Handle direct navigation properties
-                if (modelIds.ContainsKey(navigationPropertyValue))
+                // Handle navigation properties (complex objects)
+                if (!IsSimpleType(property.PropertyType) && !property.Name.EndsWith("ID"))
                 {
-                    var foreignKeyId = modelIds[navigationPropertyValue];
-                    var foreignKeyPropertyName = $"{property.Name}ID";
+                    var navigationPropertyValue = property.GetValue(model);
+                    if (navigationPropertyValue != null && modelIds.ContainsKey(navigationPropertyValue))
+                    {
+                        var foreignKeyId = modelIds[navigationPropertyValue];
+                        var foreignKeyPropertyName = $"{property.Name}ID";
 
-                    // Add to processed list to avoid duplicates
-                    processedRelationships.Add(foreignKeyPropertyName);
+                        // Add to processed list to avoid duplicates
+                        processedRelationships.Add(foreignKeyPropertyName);
 
-                    string updateQuery = $"UPDATE {tableName} SET {foreignKeyPropertyName} = {foreignKeyId} WHERE Id = {modelIds[model]}";
-                    queries.Add(updateQuery);
+                        string updateQuery = $"UPDATE {tableName} SET {foreignKeyPropertyName} = {foreignKeyId} WHERE Id = {modelIds[model]}";
+                        queries.Add(updateQuery);
+                    }
                 }
-            }
-
-            // Then handle explicit ID properties that weren't handled by navigation properties
-            foreach (var property in modelType.GetProperties())
-            {
-                if (!property.Name.EndsWith("ID") || property.Name == "Id")
-                    continue;
-
-                // Skip if we already handled this relationship via navigation property
-                if (processedRelationships.Contains(property.Name))
-                    continue;
-
-                // Find corresponding entity in modelIds
-                var relatedEntityName = property.Name.Substring(0, property.Name.Length - 2); // Remove "ID" suffix
-                var relatedEntity = modelIds.Keys.FirstOrDefault(k => k.GetType().Name == relatedEntityName);
-
-                if (relatedEntity != null)
+                // Handle explicit ID properties
+                else if (property.Name.EndsWith("ID") && property.Name != "Id" && !processedRelationships.Contains(property.Name))
                 {
-                    var foreignKeyId = modelIds[relatedEntity];
-                    string updateQuery = $"UPDATE {tableName} SET {property.Name} = {foreignKeyId} WHERE Id = {modelIds[model]}";
-                    queries.Add(updateQuery);
+                    // Find corresponding entity in modelIds
+                    var relatedEntityName = property.Name.Substring(0, property.Name.Length - 2); // Remove "ID" suffix
+                    var relatedEntity = modelIds.Keys.FirstOrDefault(k => k.GetType().Name == relatedEntityName);
+
+                    if (relatedEntity != null)
+                    {
+                        var foreignKeyId = modelIds[relatedEntity];
+                        string updateQuery = $"UPDATE {tableName} SET {property.Name} = {foreignKeyId} WHERE Id = {modelIds[model]}";
+                        queries.Add(updateQuery);
+                    }
                 }
             }
 
